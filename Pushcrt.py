@@ -90,7 +90,7 @@ def main():
     run(f'adb shell su -c "mkdir -m 700 {DEVICE_TMP_DIR}"', dry_run)
     run(f'adb push {final_cert} {DEVICE_TMP_DIR}/', dry_run)
 
-    # Backup existing certs to /sdcard/neko
+    # Backup existing certs to /sdcard/7asbec
     run(f'adb shell su -c "mkdir -m 700 {BACKUP_DIR}"', dry_run)
     run(f'adb shell su -c "cp {SYSTEM_CERT_DIR}/* {BACKUP_DIR}/"', dry_run)
 
