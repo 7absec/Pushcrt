@@ -5,8 +5,9 @@ import shutil
 import argparse
 import logging
 
-DEVICE_TMP_DIR = "/sdcard/7absec"
+DEVICE_TMP_DIR = "/sdcard/tmpcrt"
 SYSTEM_CERT_DIR = "/system/etc/security/cacerts"
+BACKUP_DIR = "/sdcard/7absec"
 
 def run(cmd, dry_run=False):
     logging.info(f"[+] Running: {cmd}")
@@ -85,16 +86,31 @@ def main():
     os.rename(temp_pem, final_cert)
     logging.info(f"[*] Using hash filename: {final_cert}")
 
-    # ADB & cert install
+    # Upload new cert to device
     run(f'adb shell su -c "mkdir -m 700 {DEVICE_TMP_DIR}"', dry_run)
     run(f'adb push {final_cert} {DEVICE_TMP_DIR}/', dry_run)
+
+    # Backup existing certs to /sdcard/neko
+    run(f'adb shell su -c "mkdir -m 700 {BACKUP_DIR}"', dry_run)
+    run(f'adb shell su -c "cp {SYSTEM_CERT_DIR}/* {BACKUP_DIR}/"', dry_run)
+
+    # Mount tmpfs over original cert dir (temporary overlay)
     run(f'adb shell su -c "mount -t tmpfs tmpfs {SYSTEM_CERT_DIR}"', dry_run)
-    run(f'adb shell su -c "cp {DEVICE_TMP_DIR}/* {SYSTEM_CERT_DIR}/"', dry_run)
+
+    # Restore original certs from backup
+    run(f'adb shell su -c "cp {BACKUP_DIR}/* {SYSTEM_CERT_DIR}/"', dry_run)
+
+    # Move the new cert from tmp dir to cert dir
+    run(f'adb shell su -c "mv {DEVICE_TMP_DIR}/{final_cert} {SYSTEM_CERT_DIR}/"', dry_run)
+
+    # Permissions and SELinux
     run(f'adb shell su -c "chown root:root {SYSTEM_CERT_DIR}/*"', dry_run)
     run(f'adb shell su -c "chmod 644 {SYSTEM_CERT_DIR}/*"', dry_run)
     run(f'adb shell su -c "chcon u:object_r:system_file:s0 {SYSTEM_CERT_DIR}/*"', dry_run)
 
-    logging.info("\n[+] Certificate installed successfully. DO NOT reboot the device.")
+    logging.info("\n[+] Certificate installed into temporary trust store. DO NOT reboot.")
+    logging.info("[*] Check device Settings > Trusted credentials > User/Apps for PortSwigger or your cert.")
+
     if os.path.exists(final_cert):
         os.remove(final_cert)
 
